@@ -68,9 +68,12 @@ class Copter:
         self.logger_directory = '~/logs/'
         # DEFAULT THRUST RATES (Corresponding to AUX input)
         self.default_control_rates = {
-            'roll': 1500, 'pitch': 1500, 'yaw': 1500, 'throttle': 1100}
+            'roll': 1500, 'pitch': 1500, 'yaw': 1500, 'throttle': 885}
         # DEFAULT AUX_CHANNEL (Starting from AUX1=CH5)
-        self.default_aux_values = {'aux'+str(i): 1500 for i in range(1, 5)}
+        # self.default_aux_values = {'aux'+str(i): 1500 for i in range(1, 5)}
+        self.default_aux_values = {
+            'aux1': 1250, 'aux2': 1500, 'aux3': 1500, 'aux4': 1500
+        }
 
         # Control settings
         # NOTE: By default, Betaflight limits the loop to 100Hz.

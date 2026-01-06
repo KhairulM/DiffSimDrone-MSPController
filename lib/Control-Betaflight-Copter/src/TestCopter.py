@@ -17,7 +17,7 @@ class TestCopter(Copter):
         super().__init__(stop_cmd)
 
         # Append a value for the internal state
-        self.copter_data["copter_state"] = 'AUTO'
+        self.copter_data["copter_state"] = None
 
     def update_copter_state(self):
         if (self.copter_data['aux3'] == None):
@@ -39,9 +39,9 @@ class TestCopter(Copter):
         tilt_min = 0
         tilt_max = 90
 
-        # tilt_to_throttle = int(((tilt - tilt_min) / tilt_max) * (throttle_max - throttle_min) + throttle_min)
+        tilt_to_throttle = int(((tilt - tilt_min) / tilt_max)
+                               * (throttle_max - throttle_min) + throttle_min)
         # self.set_rc({'throttle': tilt_to_throttle})
-        tilt_to_throttle = 1000
 
         # t = self.copter_data["pitch"]
         # print("set throttle")
@@ -55,7 +55,7 @@ class TestCopter(Copter):
                     })
 
     def control_iteration(self):
-        # self.update_copter_state()
+        self.update_copter_state()
         # only control in 'AUTO' state
         if (self.copter_data['copter_state'] != 'AUTO'):
             # enforcing always sent aux commands so we dont get an rx loss
