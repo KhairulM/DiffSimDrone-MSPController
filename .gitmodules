@@ -1,6 +1,3 @@
 [submodule "lib/pyMultiWii"]
 	path = lib/pyMultiWii
 	url = https://github.com/alduxvm/pyMultiWii.git
-[submodule "lib/Control-Betaflight-Copter"]
-	path = lib/Control-Betaflight-Copter
-	url = https://github.com/Deonixlive/Control-Betaflight-Copter.git
