@@ -84,7 +84,7 @@ class Copter:
         self.telemetry_freq = 10
 
         # Sets the frequency of the control loop (Copter.control_iteration) in Hz
-        self.control_freq = 1
+        self.control_freq = 100
 
         # functions to execute asynchronously when updating and processing copter data
         # these get sent to the telemetry thread
