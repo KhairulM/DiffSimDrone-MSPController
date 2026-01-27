@@ -19,8 +19,9 @@ def resize_nearest(image: np.ndarray, target_h: int, target_w: int) -> np.ndarra
 
 
 def preprocess_depth(depth_frame: rs.depth_frame, depth_scale: float) -> np.ndarray:
-    depth_m = np.asanyarray(depth_frame.get_data()).astype(
-        np.float32) * depth_scale
+    """Optimized preprocessing with minimal allocations."""
+    depth_m = np.asanyarray(depth_frame.get_data()).astype(np.float32)
+    depth_m *= depth_scale
 
     h, w = depth_m.shape
     target_w = int(h * 4 / 3)
@@ -28,16 +29,17 @@ def preprocess_depth(depth_frame: rs.depth_frame, depth_scale: float) -> np.ndar
         start = (w - target_w) // 2
         depth_m = depth_m[:, start:start + target_w]
 
+    # In-place operations where possible
     valid = depth_m > 0
-    inv_depth = np.zeros_like(depth_m, dtype=np.float32)
-    inv_depth[valid] = 1.0 / depth_m[valid]
+    inv_depth = np.zeros_like(depth_m)
+    np.divide(1.0, depth_m, out=inv_depth, where=valid)
 
     if valid.any():
-        mean = inv_depth[valid].mean()
-        std = inv_depth[valid].std()
-        if std < 1e-6:
-            std = 1.0
-        inv_depth[valid] = (inv_depth[valid] - mean) / std
+        valid_values = inv_depth[valid]
+        mean = valid_values.mean()
+        std = valid_values.std()
+        if std > 1e-6:
+            inv_depth[valid] = (valid_values - mean) / std
 
     resized = resize_nearest(inv_depth, 24, 32)
     # 2x2 max-pool keeps nearest point per grid
@@ -88,8 +90,18 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    session = ort.InferenceSession(args.onnx_model, providers=[
-                                   "CPUExecutionProvider"])
+    # Optimize ONNX session for ARM CPU
+    sess_options = ort.SessionOptions()
+    sess_options.intra_op_num_threads = 4  # Adjust based on MangoPi cores
+    sess_options.inter_op_num_threads = 1
+    sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+    session = ort.InferenceSession(
+        args.onnx_model,
+        sess_options=sess_options,
+        providers=["CPUExecutionProvider"]
+    )
     inputs = session.get_inputs()
     image_input = next(inp for inp in inputs if len(inp.shape) >= 4)
     obs_input = next((inp for inp in inputs if len(inp.shape) == 2), None)
@@ -100,10 +112,19 @@ def main() -> None:
 
     pipeline = rs.pipeline()
     config = rs.config()
-    config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+    config.enable_stream(rs.stream.depth, 320, 240, rs.format.z16, 30)
     profile = pipeline.start(config)
     depth_sensor = profile.get_device().first_depth_sensor()
     depth_scale = depth_sensor.get_depth_scale()
+
+    # Warm-up: run a few inference passes to stabilize performance
+    print("Warming up...")
+    dummy_image = np.random.rand(1, 1, 12, 16).astype(np.float32)
+    dummy_obs = np.zeros((1, obs_dim), dtype=np.float32)
+    for _ in range(5):
+        session.run(None, {image_input.name: dummy_image,
+                    "observation": dummy_obs})
+    print("Starting inference loop. Press 'q' to quit.\n")
 
     tty_settings = enter_cbreak()
 
@@ -121,13 +142,11 @@ def main() -> None:
 
             frame_start = time.time()
             image = preprocess_depth(depth_frame, depth_scale)
-            feed = {image_input.name: image}
-
-            obs = np.zeros((1, obs_dim), dtype=np.float32)
-            feed["observation"] = obs
+            # simulate real observation input
+            obs = np.random.rand(1, obs_dim).astype(np.float32)
+            feed = {image_input.name: image, "observation": obs}
 
             infer_start = time.time()
-
             outputs = session.run(None, feed)
 
             end = time.time()
