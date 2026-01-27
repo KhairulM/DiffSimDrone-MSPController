@@ -95,6 +95,9 @@ def main() -> None:
     obs_input = next((inp for inp in inputs if len(inp.shape) == 2), None)
     obs_dim = obs_input.shape[1] if obs_input else None
 
+    # Cache output shapes once; they should remain constant
+    output_shapes = [out.shape for out in session.get_outputs()]
+
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
@@ -103,6 +106,10 @@ def main() -> None:
     depth_scale = depth_sensor.get_depth_scale()
 
     tty_settings = enter_cbreak()
+
+    infer_times = []
+    frame_times = []
+    fps_arr = []
 
     try:
         idx = 0
@@ -116,15 +123,8 @@ def main() -> None:
             image = preprocess_depth(depth_frame, depth_scale)
             feed = {image_input.name: image}
 
-            if obs_input:
-                obs = np.zeros((1, obs_dim), dtype=np.float32)
-                if args.obs:
-                    obs_vals = np.asarray(args.obs, dtype=np.float32)
-                    if obs_vals.size != obs_dim:
-                        raise ValueError(
-                            f"Expected {obs_dim} observation values, got {obs_vals.size}")
-                    obs[0, :] = obs_vals
-                feed[obs_input.name] = obs
+            obs = np.zeros((1, obs_dim), dtype=np.float32)
+            feed["observation"] = obs
 
             infer_start = time.time()
 
@@ -135,18 +135,19 @@ def main() -> None:
             total_ms = (end - frame_start) * 1000.0
             fps = 1000.0 / total_ms if total_ms > 0.0 else float("inf")
 
-            shapes = []
-            for out in outputs:
-                shape = out.shape if hasattr(out, "shape") else type(out)
-                shapes.append(shape)
+            infer_times.append(infer_ms)
+            frame_times.append(total_ms)
+            fps_arr.append(fps)
+
             print(
-                f"Frame {idx}: infer {infer_ms:.2f} ms | frame {total_ms:.2f} ms | {fps:.2f} FPS | outputs {shapes}")
+                f"Frame {idx}: infer {infer_ms:.2f} ms | frame {total_ms:.2f} ms | {fps:.2f} FPS | outputs {output_shapes}")
 
             idx += 1
-            if args.frames and idx >= args.frames:
-                break
-            if q_pressed():
-                print("'q' pressed, stopping.")
+            if (args.frames and idx >= args.frames) or q_pressed():
+                print(
+                    f"Average inference time: {np.mean(infer_times):.2f} ms")
+                print(f"Average frame time: {np.mean(frame_times):.2f} ms")
+                print(f"Average FPS: {np.mean(fps_arr):.2f}")
                 break
     finally:
         restore_tty(tty_settings)
