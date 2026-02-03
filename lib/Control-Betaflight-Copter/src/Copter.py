@@ -81,10 +81,10 @@ class Copter:
         #       setting 'serial_update_rate_hz' in betaflight/src/main/io/serial.c to the appropriate value.
         #       If you notice the frequency dropping, the FC probably can't handle the value.
         # Updates per second (Hz)
-        self.telemetry_freq = 10
+        self.telemetry_freq = 15
 
         # Sets the frequency of the control loop (Copter.control_iteration) in Hz
-        self.control_freq = 100
+        self.control_freq = 15
 
         # functions to execute asynchronously when updating and processing copter data
         # these get sent to the telemetry thread

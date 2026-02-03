@@ -16,7 +16,7 @@ class TestCopter(Copter):
     def __init__(self, stop_cmd=None):
         super().__init__(stop_cmd)
 
-        # Append a value for the internal state
+        # Append a value for the internal st.ate
         self.copter_data["copter_state"] = None
 
     def update_copter_state(self):
