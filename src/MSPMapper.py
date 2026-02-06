@@ -13,7 +13,7 @@ _lib_path = Path(__file__).parent.parent / "lib" / \
 sys.path.insert(0, str(_lib_path))
 
 
-class RPYController(Copter):
+class MSPMapper(Copter):
     def __init__(self, stop_cmd=None, model_path=None):
         super().__init__(stop_cmd)
 
