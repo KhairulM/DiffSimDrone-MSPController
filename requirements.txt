@@ -1,6 +1,9 @@
 pyserial==3.5
 onnxruntime==1.22.1
 pyrealsense2==2.56.5.9235
+asynciolimiter==1.2.0
+pyserial_asyncio==0.6
+ratelimit==2.2.1
 # torch==2.8.0
 # torchvision==0.23.0
 # --index-url https://download.pytorch.org/whl/cpu
