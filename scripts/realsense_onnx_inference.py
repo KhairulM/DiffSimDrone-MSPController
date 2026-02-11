@@ -112,7 +112,9 @@ def main() -> None:
 
     pipeline = rs.pipeline()
     config = rs.config()
-    config.enable_stream(rs.stream.depth, 256, 144, rs.format.z16, 90)
+    config.disable_all_streams()
+    config.enable_stream(rs.stream.depth, 480, 270, rs.format.z16, 15)
+    # config.enable_stream(rs.stream.depth, 256, 144, rs.format.z16, 90)
     profile = pipeline.start(config)
     depth_sensor = profile.get_device().first_depth_sensor()
     depth_scale = depth_sensor.get_depth_scale()
