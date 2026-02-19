@@ -11,7 +11,7 @@ from sensor_msgs.msg import Image
 class DepthCamera:
     """Handles RealSense depth camera capture and preprocessing for model input using Realsense SDK or ROS 2 topic."""
 
-    def __init__(self, ros_configs=None, rs_configs=None):
+    def __init__(self, use_ros: bool = False, configs: dict = {}):
         """
         Initialize RealSense depth camera.
 
@@ -22,30 +22,28 @@ class DepthCamera:
                 height: Depth stream height
                 fps: Frames per second
         """
-        if ros_configs not in (None, {}):
-            self.use_ros = True
-            self.ros_configs = ros_configs
-            self.node = None
-            self.subscription = None
-            self.latest_depth_image = None
-            self._rclpy_initialized = False
-        else:
-            self.use_ros = False
-            self.ros_configs = {}
-            self._rclpy_initialized = False
-            self.pipeline = rs.pipeline()
-            self.config = rs.config()
-            rs_configs = rs_configs or {"width": 256, "height": 144, "fps": 90}
-            self.config.enable_stream(
-                rs.stream.depth, rs_configs["width"], rs_configs["height"], rs.format.z16, rs_configs["fps"])
-            self.profile = None
-            self.depth_scale = None
+        self.use_ros = use_ros
+        self.configs = configs
+
+        # ROS 2 variables
+        self.node = None
+        self.subscription = None
+        self.latest_depth_image = None
+        self._rclpy_initialized = False
+
+        # RealSense variables
+        self.pipeline = None
+        self.profile = None
+        self.depth_scale = None
+
+        self.started = False
 
         self.started = False
 
     def start(self):
         """Start the RealSense depth streaming."""
         if self.started:
+            print("Camera is already started.")
             return
 
         if self.use_ros:
@@ -55,52 +53,66 @@ class DepthCamera:
 
             if self.node is None:
                 self.node = Node("depth_camera_node")
-                topic_name = self.ros_configs.get(
+                topic_name = self.configs.get(
                     "topic_name", "/camera_depth")
                 self.subscription = self.node.create_subscription(
                     Image,
                     topic_name,
                     self._ros_callback,
-                    rclpy.qos.QoSProfile(
-                        depth=10, reliability=rclpy.qos.ReliabilityPolicy.RELIABLE),
+                    self.configs.get("topic_qos", rclpy.qos.QoSProfile(
+                        depth=10, reliability=rclpy.qos.ReliabilityPolicy.RELIABLE))
                 )
                 print(f"Subscribed to ROS 2 topic: {topic_name}")
 
             print("Using ROS 2 topic for depth images. No RealSense pipeline started.")
-            self.started = True
         else:
-            self.profile = self.pipeline.start(self.config)
+            self.pipeline = rs.pipeline()
+            self.rs_config = rs.config()
+            self.rs_config.enable_stream(
+                rs.stream.depth, self.configs.get("width", 256), self.configs.get("height", 144), rs.format.z16, self.configs.get("fps", 30))
+
+            self.profile = self.pipeline.start(self.rs_config)
             depth_sensor = self.profile.get_device().first_depth_sensor()
             self.depth_scale = depth_sensor.get_depth_scale()
             print(f"RealSense started. Depth scale: {self.depth_scale}")
 
-            self.started = True
+        self.started = True
 
     def stop(self):
         """Stop the RealSense streaming."""
-        if self.started:
-            if self.use_ros:
-                if self.node is not None:
-                    self.node.destroy_node()
-                    self.node = None
-                if self._rclpy_initialized and rclpy.ok():
-                    rclpy.shutdown()
-                self._rclpy_initialized = False
-            else:
-                self.pipeline.stop()
+        if not self.started:
+            print("Camera is not started.")
+            return
 
-            self.started = False
-            print("RealSense stopped.")
+        if self.use_ros:
+            if self.node is not None:
+                self.node.destroy_node()
+                self.node = None
+            if self._rclpy_initialized and rclpy.ok():
+                rclpy.shutdown()
+            self._rclpy_initialized = False
+        else:
+            self.pipeline.stop()
+            self.pipeline = None
+
+        self.started = False
+
+        print("Camera stopped.")
 
     def _ros_callback(self, msg: Image):
         """ROS 2 Image message callback to store the latest depth image."""
-        if msg.encoding != "16UC1":
+        if msg.encoding == "32FC1":
+            depth_array = np.frombuffer(
+                msg.data, dtype=np.float32).reshape(msg.height, msg.width)
+            self.latest_depth_image = depth_array
+        elif msg.encoding == "16UC1":
+            depth_array = np.frombuffer(
+                msg.data, dtype=np.uint16).reshape(msg.height, msg.width)
+            self.latest_depth_image = depth_array.astype(
+                np.float32) * 0.001  # Convert mm to meters
+        else:
             print(f"Unsupported encoding: {msg.encoding}")
             return
-        depth_array = np.frombuffer(
-            msg.data, dtype=np.uint16).reshape(msg.height, msg.width)
-        self.latest_depth_image = depth_array.astype(
-            np.float32) * 0.001  # Convert mm to meters
 
     def _resize_nearest(self, image: np.ndarray, target_h: int, target_w: int) -> np.ndarray:
         """Nearest-neighbor resize without extra dependencies."""

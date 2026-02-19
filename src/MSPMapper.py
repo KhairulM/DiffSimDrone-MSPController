@@ -1,24 +1,49 @@
-from .attitude_controller import AttitudeController
-from .model_inference import NavigationModel
-from .depth_camera import DepthCamera
-import numpy as np
-import messages as msg
-from Copter import Copter
 import sys
+import argparse
+import numpy as np
 from pathlib import Path
 
 # Add the Control-Betaflight-Copter src directory to the path
-_lib_path = Path(__file__).parent.parent / "lib" / \
-    "Control-Betaflight-Copter" / "src"
+_lib_path = Path(__file__).parent.parent / "lib" / "Control-Betaflight-Copter" / "src"
 sys.path.insert(0, str(_lib_path))
+
+import messages as msg
+from Copter import Copter
+
+from AttitudeController import AttitudeController
+from Model import NavigationModel
+from DepthCamera import DepthCamera
 
 
 class MSPMapper(Copter):
     def __init__(self, stop_cmd=None, model_path=None):
-        super().__init__(stop_cmd)
+        # Update this to your actual serial port
+        self.serial_port = "socket://127.0.0.1:5761"
+        self.serial_baudrate = 115200
+        self.default_control_rates = {
+            'roll': 1500,
+            'pitch': 1500,
+            'yaw': 1500,
+            'throttle': 1000,
+        }
+        self.default_aux_values = {
+            'aux1': 1000,
+            'aux2': 1000,
+            'aux3': 1000,
+            'aux4': 1000,
+        }
+        self.telemetry_freq = 15
+        self.control_freq = 1
+
+        super().__init__(stop_cmd=stop_cmd)
 
         # Initialize submodules
-        self.depth_camera = DepthCamera(width=256, height=144, fps=90)
+        depth_camera_ros_configs = {
+            "topic_name": "/depth_camera"
+        }
+
+        self.depth_camera = DepthCamera(
+            use_ros=True, configs=depth_camera_ros_configs)
         self.model = NavigationModel(model_path)
         self.attitude_controller = AttitudeController(
             rc_center=1500,
@@ -174,25 +199,26 @@ class MSPMapper(Copter):
         # Enable the control iteration only in AUTO mode
         if self.copter_data['aux3'] >= 1600:
             self.copter_data['copter_state'] = 'AUTO'
-        elif self.copter_data['aux3'] <= 1400:
+        elif 1400 <= self.copter_data['aux3'] < 1600:
             self.copter_data['copter_state'] = 'FAILSAFE'
         else:
             self.copter_data['copter_state'] = 'REMOTE'
 
+    # Main control loop iteration
     def control_iteration(self):
         self.update_copter_state()
 
         # Only control in 'AUTO' state
         if self.copter_data['copter_state'] != 'AUTO':
-            self.set_rc(self.default_control_rates | self.default_aux_values)
+            self.set_rc(self.default_control_rates)
             self.reset_hidden_state()  # Reset RNN state when not in AUTO
             return
 
         # Capture and preprocess depth from RealSense
         image = self.depth_camera.capture_and_preprocess()  # (1, 1, 12, 16)
         if image is None:
-            msg.display("Depth frame not available")
-            self.set_rc(self.default_control_rates | self.default_aux_values)
+            msg.display({"console": "Depth frame not available"})
+            self.set_rc(self.default_control_rates)
             return
 
         # 1. Build observation vector
@@ -221,3 +247,21 @@ class MSPMapper(Copter):
 
         # 5. Send RC commands
         self.set_rc(rc_commands | self.default_aux_values)
+
+
+def main():
+    argparser = argparse.ArgumentParser(description="MSPMapper Control Loop")
+    argparser.add_argument("--model_path", type=str,
+                           default="base.onnx", help="Path to the ONNX model file")
+    args = argparser.parse_args()
+
+    model_path = args.model_path
+    mapper = MSPMapper(model_path=model_path)
+    mapper.start_realsense()
+    mapper.start()  # Start the control loop
+
+    mapper.stop_realsense()  # Ensure RealSense is stopped on exit
+
+
+if __name__ == "__main__":
+    main()

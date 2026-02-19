@@ -20,14 +20,14 @@ class TestCopter(Copter):
         self.copter_data["copter_state"] = None
 
     def update_copter_state(self):
-        if (self.copter_data['aux2'] == None):
+        if (self.copter_data['aux3'] == None):
             msg.display(msg.copter_msp_not_ready)
             return
 
         # Enable the control iteration only in AUTO mode
-        if (self.copter_data['aux2'] >= 1600):
+        if (self.copter_data['aux3'] >= 1600):
             self.copter_data['copter_state'] = 'AUTO'
-        elif (self.copter_data['aux2'] <= 1400):
+        elif (1400 <= self.copter_data['aux3'] <= 1600):
             self.copter_data['copter_state'] = 'FAILSAFE'
         else:
             self.copter_data['copter_state'] = 'REMOTE'
@@ -55,17 +55,31 @@ class TestCopter(Copter):
                     #  'aux2': 1000,
                     })
 
+    def hover_control(self):
+        hover_control = {
+            'roll': 1500,
+            'pitch': 1500,
+            'yaw': 1500,
+            'throttle': 1800,
+            # 'aux2': 1000,
+        }
+        print("hover control")
+        print(hover_control)
+
+        self.set_rc(hover_control)
+
     def control_iteration(self):
         self.update_copter_state()
 
         # only control in 'AUTO' state
         if (self.copter_data['copter_state'] != 'AUTO'):
             # enforcing always sent aux commands so we dont get an rx loss
-            self.set_rc(self.default_control_rates | self.default_aux_values)
+            self.set_rc(self.default_control_rates)
             return
 
-        # assert self.copter_data['copter_state'] == 'AUTO', f'NOT IN AUTO STATE, INSTEAD {self.copter_data['copter_state']}'
-        self.control_by_tilt()
+        # assert self.copter_data['copter_state'] == 'AUTO', f'NOT IN AUTO STATE, INSTEAD {self.copter_data["copter_state"]}'
+        # self.control_by_tilt()
+        self.hover_control()
 
 
 if __name__ == "__main__":

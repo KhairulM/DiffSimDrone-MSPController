@@ -61,18 +61,19 @@ class Copter:
         # Name used for logging (and maybe elsewhere)
         self.name = 'DEFAULT-COPTER'
         # Serial port to Betaflight Flight Controller
-        self.serial_port = '/dev/ttyACM0'
+        # self.serial_port = '/dev/ttyACM0'
+        self.serial_port = 'socket://127.0.0.1:5761'
         self.serial_baud_rate = 115200
         # self.serial_baud_rate = 2500000
         # self.serial_baud_rate = 1_000_000
         self.logger_directory = '~/logs/'
         # DEFAULT THRUST RATES (Corresponding to AUX input)
         self.default_control_rates = {
-            'roll': 1500, 'pitch': 1500, 'yaw': 1500, 'throttle': 1500}
+            'roll': 1500, 'pitch': 1500, 'yaw': 1500, 'throttle': 1000}
         # DEFAULT AUX_CHANNEL (Starting from AUX1=CH5)
         # self.default_aux_values = {'aux'+str(i): 1500 for i in range(1, 5)}
         self.default_aux_values = {
-            'aux1': 1250, 'aux2': 1500, 'aux3': 1500, 'aux4': 1500
+            'aux1': 1000, 'aux2': 1000, 'aux3': 1000, 'aux4': 1000
         }
 
         # Control settings
@@ -81,10 +82,10 @@ class Copter:
         #       setting 'serial_update_rate_hz' in betaflight/src/main/io/serial.c to the appropriate value.
         #       If you notice the frequency dropping, the FC probably can't handle the value.
         # Updates per second (Hz)
-        self.telemetry_freq = 15
+        self.telemetry_freq = 10
 
         # Sets the frequency of the control loop (Copter.control_iteration) in Hz
-        self.control_freq = 15
+        self.control_freq = 1
 
         # functions to execute asynchronously when updating and processing copter data
         # these get sent to the telemetry thread
@@ -258,7 +259,11 @@ class Copter:
         # this has been corrected here
 
         # print(payload)
-        data = struct.pack('<8H', payload['roll'], payload['pitch'], payload['throttle'], payload['yaw'],
+        # data = struct.pack('<8H', payload['roll'], payload['pitch'], payload['throttle'], payload['yaw'],
+        #                    payload['aux1'], payload['aux2'], payload['aux3'], payload['aux4'])
+
+        # TAER1234 in SITL
+        data = struct.pack('<8H', payload['throttle'], payload['roll'], payload['pitch'], payload['yaw'],
                            payload['aux1'], payload['aux2'], payload['aux3'], payload['aux4'])
 
         # print(data)
