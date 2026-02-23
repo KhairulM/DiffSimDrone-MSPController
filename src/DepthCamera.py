@@ -69,7 +69,7 @@ class DepthCamera:
             self.pipeline = rs.pipeline()
             self.rs_config = rs.config()
             self.rs_config.enable_stream(
-                rs.stream.depth, self.configs.get("width", 256), self.configs.get("height", 144), rs.format.z16, self.configs.get("fps", 30))
+                rs.stream.depth, self.configs.get("width", 480), self.configs.get("height", 270), rs.format.z16, self.configs.get("fps", 30))
 
             self.profile = self.pipeline.start(self.rs_config)
             depth_sensor = self.profile.get_device().first_depth_sensor()

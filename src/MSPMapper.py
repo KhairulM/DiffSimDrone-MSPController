@@ -26,9 +26,16 @@ class MSPMapper(Copter):
         depth_camera_ros_configs = {
             "topic_name": "/depth_camera"
         }
+        depth_camera_realsense_configs = {
+            "width": 480,
+            "height": 270,
+            "fps": 15
+        }
 
+        # self.depth_camera = DepthCamera(
+        #     use_ros=True, configs=depth_camera_ros_configs)
         self.depth_camera = DepthCamera(
-            use_ros=True, configs=depth_camera_ros_configs)
+            use_ros=False, configs=depth_camera_realsense_configs)
         self.model = NavigationModel(model_path)
         self.attitude_controller = AttitudeController(
             rc_center=1500,
