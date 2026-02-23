@@ -1,0 +1,30 @@
+# Default Copter Configuration
+name: 'DEFAULT-COPTER'
+
+# Serial connection to Betaflight Flight Controller
+# serial_port: 'socket://127.0.0.1:5761'
+serial_port: '/dev/ttyACM0'
+serial_baud_rate: 115200
+
+# Logging
+logger_directory: '~/logs/'
+
+# Default RC channel values
+default_control_rates:
+  roll: 1500
+  pitch: 1500
+  yaw: 1500
+  throttle: 1000
+
+# Default AUX channel values (AUX1=CH5 onwards)
+default_aux_values:
+  aux1: 1000
+  aux2: 1000
+  aux3: 1000
+  aux4: 1000
+
+# Telemetry update frequency (Hz)
+telemetry_freq: 10
+
+# Control loop frequency (Hz)
+control_freq: 1

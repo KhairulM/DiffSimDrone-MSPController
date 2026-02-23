@@ -13,8 +13,8 @@ import messages as msg
 
 
 class TestCopter(Copter):
-    def __init__(self, stop_cmd=None):
-        super().__init__(stop_cmd)
+    def __init__(self, stop_cmd=None, config_path=None):
+        super().__init__(config_path=config_path, stop_cmd=stop_cmd)
 
         # Append a value for the internal st.ate
         self.copter_data["copter_state"] = None
@@ -83,5 +83,11 @@ class TestCopter(Copter):
 
 
 if __name__ == "__main__":
-    c = TestCopter()
+    import argparse
+    parser = argparse.ArgumentParser(description="TestCopter")
+    parser.add_argument("--config", type=str, default=None,
+                        help="Path to YAML configuration file")
+    args = parser.parse_args()
+
+    c = TestCopter(config_path=args.config)
     c.start()

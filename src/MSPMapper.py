@@ -16,26 +16,11 @@ from DepthCamera import DepthCamera
 
 
 class MSPMapper(Copter):
-    def __init__(self, stop_cmd=None, model_path=None):
-        # Update this to your actual serial port
-        self.serial_port = "socket://127.0.0.1:5761"
-        self.serial_baudrate = 115200
-        self.default_control_rates = {
-            'roll': 1500,
-            'pitch': 1500,
-            'yaw': 1500,
-            'throttle': 1000,
-        }
-        self.default_aux_values = {
-            'aux1': 1000,
-            'aux2': 1000,
-            'aux3': 1000,
-            'aux4': 1000,
-        }
-        self.telemetry_freq = 15
-        self.control_freq = 1
-
-        super().__init__(stop_cmd=stop_cmd)
+    def __init__(self, stop_cmd=None, model_path=None, config_path=None):
+        super().__init__(
+            config_path=config_path,
+            stop_cmd=stop_cmd,
+        )
 
         # Initialize submodules
         depth_camera_ros_configs = {
@@ -251,12 +236,17 @@ class MSPMapper(Copter):
 
 def main():
     argparser = argparse.ArgumentParser(description="MSPMapper Control Loop")
+    argparser.add_argument("--config", type=str, default=None,
+                           help="Path to YAML configuration file")
     argparser.add_argument("--model_path", type=str,
                            default="base.onnx", help="Path to the ONNX model file")
     args = argparser.parse_args()
 
     model_path = args.model_path
-    mapper = MSPMapper(model_path=model_path)
+    mapper = MSPMapper(
+        model_path=model_path,
+        config_path=args.config,
+    )
     mapper.start_realsense()
     mapper.start()  # Start the control loop
 

@@ -42,36 +42,61 @@ import serial_asyncio
 
 from contextlib import contextmanager
 
+import yaml
+from pathlib import Path
+
 
 # Controls the drone
 # Operates autonomously
 # Not Intended to use directly, instead subclass Copter as shown in TestCopter.py
 class Copter:
-    def __init__(self,
+
+    # Configurable keys and their types for validation
+    _CONFIG_KEYS = {
+        'name': str,
+        'serial_port': str,
+        'serial_baud_rate': int,
+        'logger_directory': str,
+        'default_control_rates': dict,
+        'default_aux_values': dict,
+        'telemetry_freq': (int, float),
+        'control_freq': (int, float),
+    }
+
+    @staticmethod
+    def load_config(config_path: str) -> dict:
+        """Load and validate a YAML configuration file."""
+        path = Path(config_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+        with open(path, 'r') as f:
+            config = yaml.safe_load(f)
+        if config is None:
+            return {}
+        if not isinstance(config, dict):
+            raise ValueError(f"Config file must contain a YAML mapping, got {type(config).__name__}")
+        # Validate known keys
+        for key, expected in Copter._CONFIG_KEYS.items():
+            if key in config:
+                if not isinstance(config[key], expected):
+                    raise TypeError(
+                        f"Config key '{key}' must be {expected}, got {type(config[key]).__name__}"
+                    )
+        return config
+
+    def __init__(self, 
                  config_path: str = None,
-                 stop_cmd: threading.Event = None
+                 stop_cmd: threading.Event = None,
+                 serial_port: str = None
                  ):
 
-        # configuration file implemented via YAML
-
-        self.stop_cmd = threading.Event() if stop_cmd is None else stop_cmd
-
-        # TODO Add configurable via config file
-        # Copter settings
-        # Name used for logging (and maybe elsewhere)
+        # ---- Defaults ----
         self.name = 'DEFAULT-COPTER'
-        # Serial port to Betaflight Flight Controller
-        # self.serial_port = '/dev/ttyACM0'
         self.serial_port = 'socket://127.0.0.1:5761'
         self.serial_baud_rate = 115200
-        # self.serial_baud_rate = 2500000
-        # self.serial_baud_rate = 1_000_000
         self.logger_directory = '~/logs/'
-        # DEFAULT THRUST RATES (Corresponding to AUX input)
         self.default_control_rates = {
             'roll': 1500, 'pitch': 1500, 'yaw': 1500, 'throttle': 1000}
-        # DEFAULT AUX_CHANNEL (Starting from AUX1=CH5)
-        # self.default_aux_values = {'aux'+str(i): 1500 for i in range(1, 5)}
         self.default_aux_values = {
             'aux1': 1000, 'aux2': 1000, 'aux3': 1000, 'aux4': 1000
         }
@@ -86,6 +111,18 @@ class Copter:
 
         # Sets the frequency of the control loop (Copter.control_iteration) in Hz
         self.control_freq = 1
+
+        # ---- Apply YAML config (overrides defaults) ----
+        if config_path is not None:
+            config = Copter.load_config(config_path)
+            for key in Copter._CONFIG_KEYS:
+                if key in config:
+                    setattr(self, key, config[key])
+
+        # ---- Apply explicit constructor overrides (highest priority) ----
+        self.stop_cmd = threading.Event() if stop_cmd is None else stop_cmd
+        if serial_port is not None:
+            self.serial_port = serial_port
 
         # functions to execute asynchronously when updating and processing copter data
         # these get sent to the telemetry thread
