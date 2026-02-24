@@ -1,0 +1,30 @@
+# MavrosMapper Configuration
+# ----------------------------------------------------------
+# This file mirrors configs/default.yaml but is tailored for
+# the MAVROS-based controller (MavrosMapper).
+
+name: 'MAVROS-COPTER'
+
+# ---------- MAVROS connection ----------
+# The MAVROS node itself is configured via its own launch file
+# (see launch/mavros_mapper.launch.py).  The settings below
+# are consumed only by MavrosMapper.
+
+# Control loop frequency (Hz) – how often the navigation model runs.
+# MAVROS RC override should be sent at >= 10 Hz to avoid RC failsafe.
+control_freq: 20
+
+# ---------- Default RC channel values ----------
+# Sent when the copter is NOT in AUTO mode.
+default_control_rates:
+  roll: 1500
+  pitch: 1500
+  yaw: 1500
+  throttle: 1000
+
+# Default AUX channel values (AUX1=CH5 onwards)
+default_aux_values:
+  aux1: 1000
+  aux2: 1000
+  aux3: 1000
+  aux4: 1000
