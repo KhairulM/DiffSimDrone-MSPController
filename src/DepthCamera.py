@@ -3,20 +3,19 @@
 import numpy as np
 import pyrealsense2 as rs
 
-import rclpy
-from rclpy.node import Node
+import rospy
 from sensor_msgs.msg import Image
 
 
 class DepthCamera:
-    """Handles RealSense depth camera capture and preprocessing for model input using Realsense SDK or ROS 2 topic."""
+    """Handles RealSense depth camera capture and preprocessing for model input using Realsense SDK or ROS 1 topic."""
 
     def __init__(self, use_ros: bool = False, configs: dict = {}):
         """
         Initialize RealSense depth camera.
 
         Args:
-            ros_configs: Dictionary with ROS 2 topic configurations
+            ros_configs: Dictionary with ROS 1 topic configurations
             rs_configs: Dictionary with RealSense configurations
                 width: Depth stream width
                 height: Depth stream height
@@ -25,11 +24,10 @@ class DepthCamera:
         self.use_ros = use_ros
         self.configs = configs
 
-        # ROS 2 variables
-        self.node = None
-        self.subscription = None
+        # ROS 1 variables
+        self.subscriber = None
         self.latest_depth_image = None
-        self._rclpy_initialized = False
+        self._rospy_initialized = False
 
         # RealSense variables
         self.pipeline = None
@@ -47,24 +45,23 @@ class DepthCamera:
             return
 
         if self.use_ros:
-            if not rclpy.ok():
-                rclpy.init()
-                self._rclpy_initialized = True
+            if not self._rospy_initialized:
+                rospy.init_node("depth_camera_node", anonymous=True, disable_signals=True)
+                self._rospy_initialized = True
 
-            if self.node is None:
-                self.node = Node("depth_camera_node")
+            if self.subscriber is None:
                 topic_name = self.configs.get(
                     "topic_name", "/camera_depth")
-                self.subscription = self.node.create_subscription(
-                    Image,
+                queue_size = self.configs.get("queue_size", 10)
+                self.subscriber = rospy.Subscriber(
                     topic_name,
+                    Image,
                     self._ros_callback,
-                    self.configs.get("topic_qos", rclpy.qos.QoSProfile(
-                        depth=10, reliability=rclpy.qos.ReliabilityPolicy.RELIABLE))
+                    queue_size=queue_size
                 )
-                print(f"Subscribed to ROS 2 topic: {topic_name}")
+                print(f"Subscribed to ROS 1 topic: {topic_name}")
 
-            print("Using ROS 2 topic for depth images. No RealSense pipeline started.")
+            print("Using ROS 1 topic for depth images. No RealSense pipeline started.")
         else:
             self.pipeline = rs.pipeline()
             self.rs_config = rs.config()
@@ -85,12 +82,12 @@ class DepthCamera:
             return
 
         if self.use_ros:
-            if self.node is not None:
-                self.node.destroy_node()
-                self.node = None
-            if self._rclpy_initialized and rclpy.ok():
-                rclpy.shutdown()
-            self._rclpy_initialized = False
+            if self.subscriber is not None:
+                self.subscriber.unregister()
+                self.subscriber = None
+            if self._rospy_initialized and not rospy.is_shutdown():
+                rospy.signal_shutdown("DepthCamera stopped")
+            self._rospy_initialized = False
         else:
             self.pipeline.stop()
             self.pipeline = None
@@ -121,7 +118,7 @@ class DepthCamera:
         x_idx = np.linspace(0, w - 1, target_w, dtype=np.int64)
         return image[np.ix_(y_idx, x_idx)]
 
-    def capture_and_preprocess(self) -> np.ndarray | None:
+    def capture_and_preprocess(self) -> np.ndarray:
         """
         Capture depth frame from RealSense and preprocess for model input.
 
@@ -132,7 +129,7 @@ class DepthCamera:
             return None
 
         if self.use_ros:
-            rclpy.spin_once(self.node, timeout_sec=1.0)
+            rospy.sleep(0.01)  # Allow callback thread to process messages
             if self.latest_depth_image is None:
                 return None
             depth_m = self.latest_depth_image
@@ -173,3 +170,4 @@ class DepthCamera:
         pooled = resized.reshape(12, 2, 16, 2).max(axis=(1, 3))
 
         return pooled[np.newaxis, np.newaxis, :, :].astype(np.float32)
+        # return np.zeros_like(pooled)[np.newaxis, np.newaxis, :, :].astype(np.float32)  # Placeholder for testing

@@ -12,7 +12,10 @@ name: 'MAVROS-COPTER'
 
 # Control loop frequency (Hz) – how often the navigation model runs.
 # MAVROS RC override should be sent at >= 10 Hz to avoid RC failsafe.
-control_freq: 20
+control_freq: 15
+model_path: 'ours.onnx'
+no_odom: false  # If true, ignores MAVROS odometry and relies solely on IMU for state estimation (for testing)
+max_speed: 1.0  # m/s
 
 # ---------- Default RC channel values ----------
 # Sent when the copter is NOT in AUTO mode.

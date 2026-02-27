@@ -8,7 +8,7 @@ import onnxruntime
 class NavigationModel:
     """Handles ONNX model loading and inference for drone navigation."""
 
-    def __init__(self, model_path: str | None = None):
+    def __init__(self, model_path: str):
         """
         Initialize ONNX model.
 
@@ -60,7 +60,7 @@ class NavigationModel:
     def action_to_acceleration(
         self,
         action: np.ndarray,
-        R_local: np.ndarray,
+        R: np.ndarray,
         g_std: np.ndarray
     ) -> np.ndarray:
         """
@@ -68,19 +68,15 @@ class NavigationModel:
 
         Args:
             action: Model output (1, 6) = [a_pred (3), v_pred (3)]
-            R_local: Local frame rotation matrix (3, 3)
+            R: Rotation matrix (3, 3)
             g_std: Gravity vector in world frame (3,)
 
         Returns:
             Desired acceleration in world frame (3,)
         """
-        a_pred = action[0, :3]
-        v_pred = action[0, 3:6]
-
-        # Transform action from local frame to world frame
-        a_pred_world = R_local @ a_pred
-        v_pred_world = R_local @ v_pred
-
-        # Compute desired acceleration
-        acc = a_pred_world - v_pred_world
+        act = (R @ action.reshape(2, 3).T).T  # Rotate to world frame
+        a_pred = act[0, :]
+        v_pred = act[1, :]
+        acc = a_pred - v_pred
+        acc[2] += g_std[2]  # Add gravity compensation in z-axis
         return acc
